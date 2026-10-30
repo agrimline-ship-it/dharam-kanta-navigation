@@ -1,0 +1,1980 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#123d2b">
+<title>Dharam Kanta Navigation</title>
+
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f6f4;
+  color: #17251d;
+}
+
+header {
+  background: #123d2b;
+  color: white;
+  padding: 18px 12px;
+  text-align: center;
+}
+
+header h2 {
+  margin: 0 0 8px;
+}
+
+main {
+  padding: 12px;
+  max-width: 900px;
+  margin: auto;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 7px #00000012;
+}
+
+label {
+  display: block;
+  margin: 12px 0 6px;
+  font-weight: bold;
+}
+
+button,
+select {
+  width: 100%;
+  padding: 13px;
+  margin: 6px 0;
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+button {
+  border: 0;
+  background: #176b43;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #315b80;
+}
+
+button.danger {
+  background: #a83232;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+select {
+  border: 1px solid #aaa;
+  background: white;
+}
+
+#map {
+  width: 100%;
+  height: 48vh;
+  min-height: 300px;
+  border-radius: 12px;
+  background: #e6e9e7;
+}
+
+#status {
+  background: #e7f2e9;
+  padding: 12px;
+  border-radius: 8px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#instructions {
+  padding-left: 22px;
+  line-height: 1.8;
+}
+
+.small {
+  font-size: 13px;
+  color: #555;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>Dharam Kanta Navigation</h2>
+  <div>धर्म कांटा चुनें और रास्ता देखें</div>
+</header>
+
+<main>
+
+  <section class="card">
+    <h3>1. अपनी लोकेशन</h3>
+
+    <button id="gpsButton">
+      मेरी वर्तमान लोकेशन लें
+    </button>
+
+    <p class="note">
+      GPS चालू करने के बाद मैप पर धर्म कांटे की सही जगह चुनें।
+    </p>
+
+    <label for="destination">धर्म कांटा खोजें</label>
+
+    <select id="destination">
+      <option value="">मैप पर जगह चुनें</option>
+    </select>
+
+    <button id="searchButton" class="secondary">
+      चुने हुए धर्म कांटे का मैप खोलें
+    </button>
+
+    <button id="routeButton" class="secondary">
+      सड़क का रास्ता बनाएँ
+    </button>
+
+    <button id="startButton">
+      हिंदी आवाज़ में नेविगेशन शुरू करें
+    </button>
+
+    <button id="speakButton" class="secondary">
+      निर्देश दोबारा सुनें
+    </button>
+
+    <button id="stopButton" class="danger">
+      नेविगेशन बंद करें
+    </button>
+  </section>
+
+  <section class="card">
+    <h3>2. मैप और रास्ता</h3>
+
+    <div id="map"></div>
+
+    <p class="note">
+      मैप पर टैप करके गंतव्य चुनें। चुनी हुई जगह का
+      सही धर्म कांटा होना खुद जाँचें।
+    </p>
+
+    <p class="small">
+      Map data © OpenStreetMap contributors.
+    </p>
+  </section>
+
+  <section class="card">
+    <h3>3. यात्रा की जानकारी</h3>
+
+    <div id="status" role="status" aria-live="polite">
+      वेबसाइट शुरू हो रही है...
+    </div>
+
+    <h4>आगे के निर्देश</h4>
+
+    <ol id="instructions">
+      <li>पहले GPS चालू करें और मैप पर गंतव्य चुनें।</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h3>जरूरी सूचना</h3>
+
+    <p class="note">
+      यह शुरुआती नेविगेशन संस्करण है। रूट सामान्य सड़क
+      रूटिंग सेवा से बनता है, ट्रक-विशिष्ट नहीं।
+      ट्रक की ऊँचाई, वजन, चौड़ाई, प्रतिबंधित सड़कों और
+      वास्तविक प्रवेश मार्ग की अलग से पुष्टि करें।
+      फोन लॉक होने पर ब्राउज़र GPS या आवाज़ रोक सकता है।
+    </p>
+  </section>
+
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+"use strict";
+
+/* =====================================================
+   1. APP VARIABLES
+===================================================== */
+
+const statusBox = document.getElementById("status");
+const destinationSelect = document.getElementById("destination");
+const instructionList = document.getElementById("instructions");
+
+const gpsButton = document.getElementById("gpsButton");
+const searchButton = document.getElementById("searchButton");
+const routeButton = document.getElementById("routeButton");
+const startButton = document.getElementById("startButton");
+const speakButton = document.getElementById("speakButton");
+const stopButton = document.getElementById("stopButton");
+
+let map = null;
+let currentPosition = null;
+let destinationPosition = null;
+
+let userMarker = null;
+let destinationMarker = null;
+let routeLine = null;
+
+let gpsWatch = null;
+let routeSteps = [];
+let stepIndex = 0;
+
+let navigating = false;
+let routeReady = false;
+let lastSpoken = "";
+let lastProgressPosition = null;
+let routeRequestId = 0;
+let lastProgressTime = 0;
+
+
+/* =====================================================
+   2. STATUS AND BUTTON HELPERS
+===================================================== */
+
+function showStatus(message) {
+  statusBox.textContent = message;
+}
+
+function setBusy(button, busy, busyText) {
+  if (busy) {
+    button.dataset.oldText = button.textContent;
+    button.textContent = busyText;
+    button.disabled = true;
+  } else {
+    button.textContent =
+      button.dataset.oldText || button.textContent;
+    button.disabled = false;
+  }
+}
+
+
+/* =====================================================
+   3. HINDI VOICE
+===================================================== */
+
+function speakHindi(message) {
+  if (!("speechSynthesis" in window)) {
+    showStatus(
+      message +
+      " इस ब्राउज़र में हिंदी आवाज़ उपलब्ध नहीं है।"
+    );
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(message);
+  utterance.lang = "hi-IN";
+  utterance.rate = 0.9;
+  utterance.pitch = 1;
+
+  const voices = window.speechSynthesis.getVoices();
+
+  const hindiVoice = voices.find(voice =>
+    voice.lang &&
+    voice.lang.toLowerCase().startsWith("hi")
+  );
+
+  if (hindiVoice) {
+    utterance.voice = hindiVoice;
+  }
+
+  utterance.onerror = function(event) {
+    console.error("Voice error:", event.error);
+    showStatus(
+      "हिंदी आवाज़ नहीं चल सकी। डिवाइस की आवाज़ जाँचें।"
+    );
+  };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+
+/* =====================================================
+   4. MAP INITIALIZATION
+===================================================== */
+
+function initMap() {
+  if (typeof L === "undefined") {
+    showStatus(
+      "मैप लाइब्रेरी लोड नहीं हुई। इंटरनेट जाँचकर पेज Refresh करें।"
+    );
+    return;
+  }
+
+  try {
+    map = L.map("map").setView([28.97, 77.69], 13);
+
+    L.tileLayer(
+      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }
+    ).addTo(map);
+
+    map.on("click", function(event) {
+      setDestination({
+        lat: event.latlng.lat,
+        lng: event.latlng.lng
+      });
+
+      showStatus(
+        "गंतव्य चुना गया। सही धर्म कांटा होने की पुष्टि करें।"
+      );
+    });
+
+    setTimeout(function() {
+      map.invalidateSize();
+    }, 300);
+
+    showStatus(
+      "मैप तैयार है। अपनी वर्तमान लोकेशन लेने के लिए GPS बटन दबाएँ।"
+    );
+
+  } catch (error) {
+    console.error("Map initialization error:", error);
+
+    showStatus(
+      "मैप शुरू नहीं हुआ। इंटरनेट जाँचें और Console error देखें।"
+    );
+  }
+}
+
+
+/* =====================================================
+   5. SET DESTINATION
+===================================================== */
+
+function setDestination(position) {
+  destinationPosition = {
+    lat: position.lat,
+    lng: position.lng
+  };
+
+  routeReady = false;
+  routeSteps = [];
+  navigating = false;
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  if (destinationMarker && map) {
+    map.removeLayer(destinationMarker);
+  }
+
+  if (routeLine && map) {
+    map.removeLayer(routeLine);
+    routeLine = null;
+  }
+
+  destinationMarker = L.marker([
+    destinationPosition.lat,
+    destinationPosition.lng
+  ])
+  .addTo(map)
+  .bindPopup("चुना हुआ गंतव्य");
+
+  destinationMarker.openPopup();
+
+  destinationSelect.innerHTML = "";
+
+  const option = document.createElement("option");
+  option.value = "selected";
+  option.textContent =
+    "चुना हुआ स्थान: " +
+    destinationPosition.lat.toFixed(5) +
+    ", " +
+    destinationPosition.lng.toFixed(5);
+
+  destinationSelect.appendChild(option);
+
+  map.panTo([
+    destinationPosition.lat,
+    destinationPosition.lng
+  ]);
+
+  instructionList.innerHTML =
+    "<li>गंतव्य चुना गया। अब सड़क का रास्ता बनाएँ।</li>";
+}
+
+
+/* =====================================================
+   6. GPS
+===================================================== */
+
+function startGPS() {
+  if (!navigator.geolocation) {
+    showStatus(
+      "इस ब्राउज़र में GPS सुविधा उपलब्ध नहीं है।"
+    );
+    return;
+  }
+
+  if (!window.isSecureContext) {
+    showStatus(
+      "GPS के लिए HTTPS वेबसाइट खोलें। सीधे HTML फाइल खोलने पर GPS उपलब्ध नहीं हो सकता।"
+    );
+    return;
+  }
+
+  setBusy(gpsButton, true, "GPS प्राप्त हो रहा है...");
+  showStatus("आपकी वर्तमान लोकेशन प्राप्त की जा रही है...");
+
+  if (gpsWatch !== null) {
+    navigator.geolocation.clearWatch(gpsWatch);
+  }
+
+  gpsWatch = navigator.geolocation.watchPosition(
+    function(position) {
+      currentPosition = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+
+      const point = [
+        currentPosition.lat,
+        currentPosition.lng
+      ];
+
+      if (!userMarker) {
+        userMarker = L.marker(point)
+          .addTo(map)
+          .bindPopup("आपकी वर्तमान लोकेशन");
+      } else {
+        userMarker.setLatLng(point);
+      }
+
+      setBusy(gpsButton, false);
+
+      if (!navigating) {
+        map.setView(point, 15);
+        showStatus(
+          "GPS चालू है। अब मैप पर धर्म कांटे की जगह चुनें।"
+        );
+      } else {
+        updateNavigation();
+      }
+    },
+
+    function(error) {
+      console.error("GPS error:", error);
+
+      setBusy(gpsButton, false);
+
+      const errors = {
+        1: "लोकेशन की अनुमति नहीं मिली। Chrome में Location permission Allow करें।",
+        2: "लोकेशन उपलब्ध नहीं है। Windows Location चालू करके दोबारा कोशिश करें।",
+        3: "GPS का समय समाप्त हो गया। दोबारा कोशिश करें।"
+      };
+
+      showStatus(
+        errors[error.code] ||
+        "GPS लोकेशन नहीं मिल सकी।"
+      );
+    },
+
+    {
+      enableHighAccuracy: true,
+      maximumAge: 3000,
+      timeout: 20000
+    }
+  );
+}
+
+
+/* =====================================================
+   7. DISTANCE CALCULATION
+===================================================== */
+
+function distanceMeters(a, b) {
+  const R = 6371000;
+  const rad = value => value * Math.PI / 180;
+
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+
+  const lat1 = rad(a.lat);
+  const lat2 = rad(b.lat);
+
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) *
+    Math.cos(lat2) *
+    Math.sin(dLng / 2) ** 2;
+
+  return 2 * R *
+    Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+
+/* =====================================================
+   8. BUILD ROAD ROUTE
+===================================================== */
+
+async function getRoute() {
+  if (!map) {
+    showStatus("मैप उपलब्ध नहीं है। पेज Refresh करें।");
+    return false;
+  }
+
+  if (!currentPosition) {
+    showStatus("पहले मेरी वर्तमान लोकेशन लें।");
+    return false;
+  }
+
+  if (!destinationPosition) {
+    showStatus("पहले मैप पर धर्म कांटे की जगह चुनें।");
+    return false;
+  }
+
+  const requestId = ++routeRequestId;
+
+  navigating = false;
+  routeReady = false;
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  setBusy(routeButton, true, "रास्ता बनाया जा रहा है...");
+  showStatus("सड़क का रास्ता प्राप्त किया जा रहा है...");
+
+  const start =
+    `${currentPosition.lng},${currentPosition.lat}`;
+
+  const end =
+    `${destinationPosition.lng},${destinationPosition.lat}`;
+
+  const url =
+    "https://router.project-osrm.org/route/v1/driving/" +
+    start + ";" + end +
+    "?overview=full&geometries=geojson&steps=true";
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error("Route server HTTP " + response.status);
+    }
+
+    const data = await response.json();
+
+    if (requestId !== routeRequestId) {
+      return false;
+    }
+
+    if (data.code !== "Ok" || !data.routes?.length) {
+      throw new Error(data.message || "Route not found");
+    }
+
+    const route = data.routes[0];
+
+    if (routeLine) {
+      map.removeLayer(routeLine);
+    }
+
+    routeLine = L.geoJSON(route.geometry, {
+      style: {
+        color: "#176b43",
+        weight: 6,
+        opacity: 0.85
+      }
+    }).addTo(map);
+
+    map.fitBounds(routeLine.getBounds(), {
+      padding: [25, 25]
+    });
+
+    routeSteps = route.legs[0].steps || [];
+    stepIndex = Math.min(
+      1,
+      Math.max(0, routeSteps.length - 1)
+    );
+
+    routeReady = routeSteps.length > 0;
+    lastSpoken = "";
+
+    const km = (route.distance / 1000).toFixed(1);
+    const minutes = Math.round(route.duration / 60);
+
+    const summary =
+      `रूट तैयार है। दूरी लगभग ${km} किलोमीटर, ` +
+      `अनुमानित समय ${minutes} मिनट। ` +
+      "यह ट्रक-प्रमाणित रूट नहीं है।";
+
+    showStatus(summary);
+
+    instructionList.innerHTML = "";
+
+    routeSteps.slice(0, 12).forEach(function(step) {
+      const li = document.createElement("li");
+      li.textContent = hindiInstruction(step);
+      instructionList.appendChild(li);
+    });
+
+    if (routeSteps.length > 12) {
+      const li = document.createElement("li");
+      li.textContent =
+        "बाकी निर्देश यात्रा के दौरान देखें।";
+      instructionList.appendChild(li);
+    }
+
+    return routeReady;
+
+  } catch (error) {
+    console.error("Route error:", error);
+
+    if (requestId === routeRequestId) {
+      showStatus(
+        "रास्ता नहीं बन सका। इंटरनेट कनेक्शन जाँचें। " +
+        "सार्वजनिक रूट सर्वर भी अस्थायी रूप से अनुपलब्ध हो सकता है।"
+      );
+    }
+
+    return false;
+
+  } finally {
+    if (requestId === routeRequestId) {
+      setBusy(routeButton, false);
+    }
+  }
+}
+
+
+/* =====================================================
+   9. HINDI TURN INSTRUCTIONS
+===================================================== */
+
+function hindiInstruction(step) {
+  const maneuver = step.maneuver || {};
+  const type = maneuver.type || "";
+  const modifier = maneuver.modifier || "";
+
+  const road = step.name
+    ? " " + step.name + " सड़क पर"
+    : "";
+
+  if (type === "arrive") {
+    return "आप अपने चुने हुए गंतव्य पर पहुँच गए हैं।";
+  }
+
+  if (type === "depart") {
+    return "रास्ता शुरू करें।" + road;
+  }
+
+  if (
+    type === "roundabout" ||
+    type === "rotary" ||
+    type === "roundabout turn"
+  ) {
+    return "आगे गोल चक्कर है। सड़क के संकेत देखकर सही निकास लें।";
+  }
+
+  if (modifier === "uturn") {
+    return "आगे यू-टर्न लें।";
+  }
+
+  if (modifier && modifier.includes("left")) {
+    return "आगे बाईं ओर मुड़ें।" + road;
+  }
+
+  if (modifier && modifier.includes("right")) {
+    return "आगे दाईं ओर मुड़ें।" + road;
+  }
+
+  if (
+    type === "continue" ||
+    type === "new name" ||
+    modifier === "straight"
+  ) {
+    return "सीधे चलते रहें।" + road;
+  }
+
+  return "आगे सड़क के संकेतों के अनुसार चलते रहें।" + road;
+}
+
+
+/* =====================================================
+   10. START NAVIGATION
+===================================================== */
+
+async function startNavigation() {
+  if (!currentPosition) {
+    showStatus("पहले मेरी वर्तमान लोकेशन लें।");
+    return;
+  }
+
+  if (!destinationPosition) {
+    showStatus("पहले मैप पर धर्म कांटे की जगह चुनें।");
+    return;
+  }
+
+  setBusy(startButton, true, "नेविगेशन शुरू हो रहा है...");
+
+  try {
+    if (!routeReady) {
+      const success = await getRoute();
+
+      if (!success) {
+        return;
+      }
+    }
+
+    beginGuidance();
+
+  } finally {
+    setBusy(startButton, false);
+  }
+}
+
+function beginGuidance() {
+  if (!routeSteps.length) {
+    showStatus("रूट के निर्देश उपलब्ध नहीं हैं।");
+    return;
+  }
+
+  navigating = true;
+
+  stepIndex = Math.min(
+    1,
+    Math.max(0, routeSteps.length - 1)
+  );
+
+  lastProgressPosition = {
+    ...currentPosition
+  };
+
+  lastProgressTime = Date.now();
+
+  lastSpoken = hindiInstruction(routeSteps[stepIndex]);
+
+  speakHindi(lastSpoken);
+
+  updateNavigation();
+
+  showStatus(
+    "हिंदी नेविगेशन शुरू है। GPS चालू रखें और सड़क के संकेतों का पालन करें।"
+  );
+}
+
+
+/* =====================================================
+   11. UPDATE GUIDANCE FROM GPS
+===================================================== */
+
+function updateNavigation() {
+  if (
+    !navigating ||
+    !currentPosition ||
+    !routeSteps.length
+  ) {
+    return;
+  }
+
+  while (stepIndex < routeSteps.length - 1) {
+    const maneuver = routeSteps[stepIndex].maneuver;
+
+    if (!maneuver || !maneuver.location) {
+      break;
+    }
+
+    const target = {
+      lat: maneuver.location[1],
+      lng: maneuver.location[0]
+    };
+
+    const distance = distanceMeters(
+      currentPosition,
+      target
+    );
+
+    if (distance < 35) {
+      stepIndex++;
+
+      lastSpoken = hindiInstruction(routeSteps[stepIndex]);
+
+      speakHindi(lastSpoken);
+
+      lastProgressTime = Date.now();
+    } else {
+      break;
+    }
+  }
+
+  const step = routeSteps[stepIndex];
+
+  if (!step) return;
+
+  const maneuver = step.maneuver || {};
+  let distanceText = "";
+
+  if (maneuver.location) {
+    const target = {
+      lat: maneuver.location[1],
+      lng: maneuver.location[0]
+    };
+
+    const distance = distanceMeters(
+      currentPosition,
+      target
+    );
+
+    distanceText =
+      " | अगले मोड़ तक लगभग " +
+      Math.round(distance) +
+      " मीटर";
+  }
+
+  showStatus(
+    "अगला निर्देश: " +
+    hindiInstruction(step) +
+    distanceText
+  );
+
+  lastProgressPosition = {
+    ...currentPosition
+  };
+}
+
+
+/* =====================================================
+   12. REPEAT VOICE
+===================================================== */
+
+function speakCurrent() {
+  if (!routeReady || !routeSteps.length) {
+    showStatus("पहले सड़क का रूट बनाएँ।");
+    return;
+  }
+
+  speakHindi(
+    hindiInstruction(routeSteps[stepIndex])
+  );
+}
+
+
+/* =====================================================
+   13. OPEN DESTINATION IN MAP
+===================================================== */
+
+function searchDestination() {
+  if (!destinationPosition) {
+    showStatus(
+      "पहले मैप पर धर्म कांटे की जगह टैप करें।"
+    );
+    return;
+  }
+
+  const lat = destinationPosition.lat;
+  const lng = destinationPosition.lng;
+
+  const url =
+    "https://www.openstreetmap.org/?mlat=" +
+    encodeURIComponent(lat) +
+    "&mlon=" +
+    encodeURIComponent(lng) +
+    "#map=17/" +
+    encodeURIComponent(lat) +
+    "/" +
+    encodeURIComponent(lng);
+
+  window.open(url, "_blank", "noopener");
+}
+
+
+/* =====================================================
+   14. STOP NAVIGATION
+===================================================== */
+
+function stopNavigation() {
+  navigating = false;
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  if (gpsWatch !== null) {
+    navigator.geolocation.clearWatch(gpsWatch);
+    gpsWatch = null;
+  }
+
+  setBusy(gpsButton, false);
+  setBusy(routeButton, false);
+  setBusy(startButton, false);
+
+  showStatus(
+    "नेविगेशन बंद है। GPS मॉनिटरिंग भी रोक दी गई है।"
+  );
+}
+
+
+/* =====================================================
+   15. BUTTON EVENTS
+===================================================== */
+
+gpsButton.addEventListener("click", startGPS);
+
+searchButton.addEventListener(
+  "click",
+  searchDestination
+);
+
+routeButton.addEventListener(
+  "click",
+  getRoute
+);
+
+startButton.addEventListener(
+  "click",
+  startNavigation
+);
+
+speakButton.addEventListener(
+  "click",
+  speakCurrent
+);
+
+stopButton.addEventListener(
+  "click",
+  stopNavigation
+);
+
+
+/* =====================================================
+   16. APP START
+===================================================== */
+
+window.addEventListener("error", function(event) {
+  console.error("JavaScript error:", event.message);
+
+  showStatus(
+    "JavaScript में समस्या आई है। " +
+    "Chrome Console में लाल error देखें।"
+  );
+});
+
+initMap();
+
+</script>
+
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#123d2b">
+<title>Dharam Kanta Navigation</title>
+
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f6f4;
+  color: #17251d;
+}
+
+header {
+  background: #123d2b;
+  color: white;
+  padding: 18px 12px;
+  text-align: center;
+}
+
+header h2 {
+  margin: 0 0 8px;
+}
+
+main {
+  padding: 12px;
+  max-width: 900px;
+  margin: auto;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 7px #00000012;
+}
+
+label {
+  display: block;
+  margin: 12px 0 6px;
+  font-weight: bold;
+}
+
+button,
+select {
+  width: 100%;
+  padding: 13px;
+  margin: 6px 0;
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+button {
+  border: 0;
+  background: #176b43;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #315b80;
+}
+
+button.danger {
+  background: #a83232;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+select {
+  border: 1px solid #aaa;
+  background: white;
+}
+
+#map {
+  width: 100%;
+  height: 48vh;
+  min-height: 300px;
+  border-radius: 12px;
+  background: #e6e9e7;
+}
+
+#status {
+  background: #e7f2e9;
+  padding: 12px;
+  border-radius: 8px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#instructions {
+  padding-left: 22px;
+  line-height: 1.8;
+}
+
+.small {
+  font-size: 13px;
+  color: #555;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>Dharam Kanta Navigation</h2>
+  <div>धर्म कांटा चुनें और रास्ता देखें</div>
+</header>
+
+<main>
+
+  <section class="card">
+    <h3>1. अपनी लोकेशन</h3>
+
+    <button id="gpsButton">
+      मेरी वर्तमान लोकेशन लें
+    </button>
+
+    <p class="note">
+      GPS चालू करने के बाद मैप पर धर्म कांटे की सही जगह चुनें।
+    </p>
+
+    <label for="destination">धर्म कांटा खोजें</label>
+
+    <select id="destination">
+      <option value="">मैप पर जगह चुनें</option>
+    </select>
+
+    <button id="searchButton" class="secondary">
+      चुने हुए धर्म कांटे का मैप खोलें
+    </button>
+
+    <button id="routeButton" class="secondary">
+      सड़क का रास्ता बनाएँ
+    </button>
+
+    <button id="startButton">
+      हिंदी आवाज़ में नेविगेशन शुरू करें
+    </button>
+
+    <button id="speakButton" class="secondary">
+      निर्देश दोबारा सुनें
+    </button>
+
+    <button id="stopButton" class="danger">
+      नेविगेशन बंद करें
+    </button>
+  </section>
+
+  <section class="card">
+    <h3>2. मैप और रास्ता</h3>
+
+    <div id="map"></div>
+
+    <p class="note">
+      मैप पर टैप करके गंतव्य चुनें। चुनी हुई जगह का
+      सही धर्म कांटा होना खुद जाँचें।
+    </p>
+
+    <p class="small">
+      Map data © OpenStreetMap contributors.
+    </p>
+  </section>
+
+  <section class="card">
+    <h3>3. यात्रा की जानकारी</h3>
+
+    <div id="status" role="status" aria-live="polite">
+      वेबसाइट शुरू हो रही है...
+    </div>
+
+    <h4>आगे के निर्देश</h4>
+
+    <ol id="instructions">
+      <li>पहले GPS चालू करें और मैप पर गंतव्य चुनें।</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h3>जरूरी सूचना</h3>
+
+    <p class="note">
+      यह शुरुआती नेविगेशन संस्करण है। रूट सामान्य सड़क
+      रूटिंग सेवा से बनता है, ट्रक-विशिष्ट नहीं।
+      ट्रक की ऊँचाई, वजन, चौड़ाई, प्रतिबंधित सड़कों और
+      वास्तविक प्रवेश मार्ग की अलग से पुष्टि करें।
+      फोन लॉक होने पर ब्राउज़र GPS या आवाज़ रोक सकता है।
+    </p>
+  </section>
+
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+"use strict";
+
+/* =====================================================
+   1. APP VARIABLES
+===================================================== */
+
+const statusBox = document.getElementById("status");
+const destinationSelect = document.getElementById("destination");
+const instructionList = document.getElementById("instructions");
+
+const gpsButton = document.getElementById("gpsButton");
+const searchButton = document.getElementById("searchButton");
+const routeButton = document.getElementById("routeButton");
+const startButton = document.getElementById("startButton");
+const speakButton = document.getElementById("speakButton");
+const stopButton = document.getElementById("stopButton");
+
+let map = null;
+let currentPosition = null;
+let destinationPosition = null;
+
+let userMarker = null;
+let destinationMarker = null;
+let routeLine = null;
+
+let gpsWatch = null;
+let routeSteps = [];
+let stepIndex = 0;
+
+let navigating = false;
+let routeReady = false;
+let lastSpoken = "";
+let lastProgressPosition = null;
+let routeRequestId = 0;
+let lastProgressTime = 0;
+
+
+/* =====================================================
+   2. STATUS AND BUTTON HELPERS
+===================================================== */
+
+function showStatus(message) {
+  statusBox.textContent = message;
+}
+
+function setBusy(button, busy, busyText) {
+  if (busy) {
+    button.dataset.oldText = button.textContent;
+    button.textContent = busyText;
+    button.disabled = true;
+  } else {
+    button.textContent =
+      button.dataset.oldText || button.textContent;
+    button.disabled = false;
+  }
+}
+
+
+/* =====================================================
+   3. HINDI VOICE
+===================================================== */
+
+function speakHindi(message) {
+  if (!("speechSynthesis" in window)) {
+    showStatus(
+      message +
+      " इस ब्राउज़र में हिंदी आवाज़ उपलब्ध नहीं है।"
+    );
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(message);
+  utterance.lang = "hi-IN";
+  utterance.rate = 0.9;
+  utterance.pitch = 1;
+
+  const voices = window.speechSynthesis.getVoices();
+
+  const hindiVoice = voices.find(voice =>
+    voice.lang &&
+    voice.lang.toLowerCase().startsWith("hi")
+  );
+
+  if (hindiVoice) {
+    utterance.voice = hindiVoice;
+  }
+
+  utterance.onerror = function(event) {
+    console.error("Voice error:", event.error);
+    showStatus(
+      "हिंदी आवाज़ नहीं चल सकी। डिवाइस की आवाज़ जाँचें।"
+    );
+  };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+
+/* =====================================================
+   4. MAP INITIALIZATION
+===================================================== */
+
+function initMap() {
+  if (typeof L === "undefined") {
+    showStatus(
+      "मैप लाइब्रेरी लोड नहीं हुई। इंटरनेट जाँचकर पेज Refresh करें।"
+    );
+    return;
+  }
+
+  try {
+    map = L.map("map").setView([28.97, 77.69], 13);
+
+    L.tileLayer(
+      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }
+    ).addTo(map);
+
+    map.on("click", function(event) {
+      setDestination({
+        lat: event.latlng.lat,
+        lng: event.latlng.lng
+      });
+
+      showStatus(
+        "गंतव्य चुना गया। सही धर्म कांटा होने की पुष्टि करें।"
+      );
+    });
+
+    setTimeout(function() {
+      map.invalidateSize();
+    }, 300);
+
+    showStatus(
+      "मैप तैयार है। अपनी वर्तमान लोकेशन लेने के लिए GPS बटन दबाएँ।"
+    );
+
+  } catch (error) {
+    console.error("Map initialization error:", error);
+
+    showStatus(
+      "मैप शुरू नहीं हुआ। इंटरनेट जाँचें और Console error देखें।"
+    );
+  }
+}
+
+
+/* =====================================================
+   5. SET DESTINATION
+===================================================== */
+
+function setDestination(position) {
+  destinationPosition = {
+    lat: position.lat,
+    lng: position.lng
+  };
+
+  routeReady = false;
+  routeSteps = [];
+  navigating = false;
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  if (destinationMarker && map) {
+    map.removeLayer(destinationMarker);
+  }
+
+  if (routeLine && map) {
+    map.removeLayer(routeLine);
+    routeLine = null;
+  }
+
+  destinationMarker = L.marker([
+    destinationPosition.lat,
+    destinationPosition.lng
+  ])
+  .addTo(map)
+  .bindPopup("चुना हुआ गंतव्य");
+
+  destinationMarker.openPopup();
+
+  destinationSelect.innerHTML = "";
+
+  const option = document.createElement("option");
+  option.value = "selected";
+  option.textContent =
+    "चुना हुआ स्थान: " +
+    destinationPosition.lat.toFixed(5) +
+    ", " +
+    destinationPosition.lng.toFixed(5);
+
+  destinationSelect.appendChild(option);
+
+  map.panTo([
+    destinationPosition.lat,
+    destinationPosition.lng
+  ]);
+
+  instructionList.innerHTML =
+    "<li>गंतव्य चुना गया। अब सड़क का रास्ता बनाएँ।</li>";
+}
+
+
+/* =====================================================
+   6. GPS
+===================================================== */
+
+function startGPS() {
+  if (!navigator.geolocation) {
+    showStatus(
+      "इस ब्राउज़र में GPS सुविधा उपलब्ध नहीं है।"
+    );
+    return;
+  }
+
+  if (!window.isSecureContext) {
+    showStatus(
+      "GPS के लिए HTTPS वेबसाइट खोलें। सीधे HTML फाइल खोलने पर GPS उपलब्ध नहीं हो सकता।"
+    );
+    return;
+  }
+
+  setBusy(gpsButton, true, "GPS प्राप्त हो रहा है...");
+  showStatus("आपकी वर्तमान लोकेशन प्राप्त की जा रही है...");
+
+  if (gpsWatch !== null) {
+    navigator.geolocation.clearWatch(gpsWatch);
+  }
+
+  gpsWatch = navigator.geolocation.watchPosition(
+    function(position) {
+      currentPosition = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+
+      const point = [
+        currentPosition.lat,
+        currentPosition.lng
+      ];
+
+      if (!userMarker) {
+        userMarker = L.marker(point)
+          .addTo(map)
+          .bindPopup("आपकी वर्तमान लोकेशन");
+      } else {
+        userMarker.setLatLng(point);
+      }
+
+      setBusy(gpsButton, false);
+
+      if (!navigating) {
+        map.setView(point, 15);
+        showStatus(
+          "GPS चालू है। अब मैप पर धर्म कांटे की जगह चुनें।"
+        );
+      } else {
+        updateNavigation();
+      }
+    },
+
+    function(error) {
+      console.error("GPS error:", error);
+
+      setBusy(gpsButton, false);
+
+      const errors = {
+        1: "लोकेशन की अनुमति नहीं मिली। Chrome में Location permission Allow करें।",
+        2: "लोकेशन उपलब्ध नहीं है। Windows Location चालू करके दोबारा कोशिश करें।",
+        3: "GPS का समय समाप्त हो गया। दोबारा कोशिश करें।"
+      };
+
+      showStatus(
+        errors[error.code] ||
+        "GPS लोकेशन नहीं मिल सकी।"
+      );
+    },
+
+    {
+      enableHighAccuracy: true,
+      maximumAge: 3000,
+      timeout: 20000
+    }
+  );
+}
+
+
+/* =====================================================
+   7. DISTANCE CALCULATION
+===================================================== */
+
+function distanceMeters(a, b) {
+  const R = 6371000;
+  const rad = value => value * Math.PI / 180;
+
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+
+  const lat1 = rad(a.lat);
+  const lat2 = rad(b.lat);
+
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) *
+    Math.cos(lat2) *
+    Math.sin(dLng / 2) ** 2;
+
+  return 2 * R *
+    Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+
+/* =====================================================
+   8. BUILD ROAD ROUTE
+===================================================== */
+
+async function getRoute() {
+  if (!map) {
+    showStatus("मैप उपलब्ध नहीं है। पेज Refresh करें।");
+    return false;
+  }
+
+  if (!currentPosition) {
+    showStatus("पहले मेरी वर्तमान लोकेशन लें।");
+    return false;
+  }
+
+  if (!destinationPosition) {
+    showStatus("पहले मैप पर धर्म कांटे की जगह चुनें।");
+    return false;
+  }
+
+  const requestId = ++routeRequestId;
+
+  navigating = false;
+  routeReady = false;
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  setBusy(routeButton, true, "रास्ता बनाया जा रहा है...");
+  showStatus("सड़क का रास्ता प्राप्त किया जा रहा है...");
+
+  const start =
+    `${currentPosition.lng},${currentPosition.lat}`;
+
+  const end =
+    `${destinationPosition.lng},${destinationPosition.lat}`;
+
+  const url =
+    "https://router.project-osrm.org/route/v1/driving/" +
+    start + ";" + end +
+    "?overview=full&geometries=geojson&steps=true";
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error("Route server HTTP " + response.status);
+    }
+
+    const data = await response.json();
+
+    if (requestId !== routeRequestId) {
+      return false;
+    }
+
+    if (data.code !== "Ok" || !data.routes?.length) {
+      throw new Error(data.message || "Route not found");
+    }
+
+    const route = data.routes[0];
+
+    if (routeLine) {
+      map.removeLayer(routeLine);
+    }
+
+    routeLine = L.geoJSON(route.geometry, {
+      style: {
+        color: "#176b43",
+        weight: 6,
+        opacity: 0.85
+      }
+    }).addTo(map);
+
+    map.fitBounds(routeLine.getBounds(), {
+      padding: [25, 25]
+    });
+
+    routeSteps = route.legs[0].steps || [];
+    stepIndex = Math.min(
+      1,
+      Math.max(0, routeSteps.length - 1)
+    );
+
+    routeReady = routeSteps.length > 0;
+    lastSpoken = "";
+
+    const km = (route.distance / 1000).toFixed(1);
+    const minutes = Math.round(route.duration / 60);
+
+    const summary =
+      `रूट तैयार है। दूरी लगभग ${km} किलोमीटर, ` +
+      `अनुमानित समय ${minutes} मिनट। ` +
+      "यह ट्रक-प्रमाणित रूट नहीं है।";
+
+    showStatus(summary);
+
+    instructionList.innerHTML = "";
+
+    routeSteps.slice(0, 12).forEach(function(step) {
+      const li = document.createElement("li");
+      li.textContent = hindiInstruction(step);
+      instructionList.appendChild(li);
+    });
+
+    if (routeSteps.length > 12) {
+      const li = document.createElement("li");
+      li.textContent =
+        "बाकी निर्देश यात्रा के दौरान देखें।";
+      instructionList.appendChild(li);
+    }
+
+    return routeReady;
+
+  } catch (error) {
+    console.error("Route error:", error);
+
+    if (requestId === routeRequestId) {
+      showStatus(
+        "रास्ता नहीं बन सका। इंटरनेट कनेक्शन जाँचें। " +
+        "सार्वजनिक रूट सर्वर भी अस्थायी रूप से अनुपलब्ध हो सकता है।"
+      );
+    }
+
+    return false;
+
+  } finally {
+    if (requestId === routeRequestId) {
+      setBusy(routeButton, false);
+    }
+  }
+}
+
+
+/* =====================================================
+   9. HINDI TURN INSTRUCTIONS
+===================================================== */
+
+function hindiInstruction(step) {
+  const maneuver = step.maneuver || {};
+  const type = maneuver.type || "";
+  const modifier = maneuver.modifier || "";
+
+  const road = step.name
+    ? " " + step.name + " सड़क पर"
+    : "";
+
+  if (type === "arrive") {
+    return "आप अपने चुने हुए गंतव्य पर पहुँच गए हैं।";
+  }
+
+  if (type === "depart") {
+    return "रास्ता शुरू करें।" + road;
+  }
+
+  if (
+    type === "roundabout" ||
+    type === "rotary" ||
+    type === "roundabout turn"
+  ) {
+    return "आगे गोल चक्कर है। सड़क के संकेत देखकर सही निकास लें।";
+  }
+
+  if (modifier === "uturn") {
+    return "आगे यू-टर्न लें।";
+  }
+
+  if (modifier && modifier.includes("left")) {
+    return "आगे बाईं ओर मुड़ें।" + road;
+  }
+
+  if (modifier && modifier.includes("right")) {
+    return "आगे दाईं ओर मुड़ें।" + road;
+  }
+
+  if (
+    type === "continue" ||
+    type === "new name" ||
+    modifier === "straight"
+  ) {
+    return "सीधे चलते रहें।" + road;
+  }
+
+  return "आगे सड़क के संकेतों के अनुसार चलते रहें।" + road;
+}
+
+
+/* =====================================================
+   10. START NAVIGATION
+===================================================== */
+
+async function startNavigation() {
+  if (!currentPosition) {
+    showStatus("पहले मेरी वर्तमान लोकेशन लें।");
+    return;
+  }
+
+  if (!destinationPosition) {
+    showStatus("पहले मैप पर धर्म कांटे की जगह चुनें।");
+    return;
+  }
+
+  setBusy(startButton, true, "नेविगेशन शुरू हो रहा है...");
+
+  try {
+    if (!routeReady) {
+      const success = await getRoute();
+
+      if (!success) {
+        return;
+      }
+    }
+
+    beginGuidance();
+
+  } finally {
+    setBusy(startButton, false);
+  }
+}
+
+function beginGuidance() {
+  if (!routeSteps.length) {
+    showStatus("रूट के निर्देश उपलब्ध नहीं हैं।");
+    return;
+  }
+
+  navigating = true;
+
+  stepIndex = Math.min(
+    1,
+    Math.max(0, routeSteps.length - 1)
+  );
+
+  lastProgressPosition = {
+    ...currentPosition
+  };
+
+  lastProgressTime = Date.now();
+
+  lastSpoken = hindiInstruction(routeSteps[stepIndex]);
+
+  speakHindi(lastSpoken);
+
+  updateNavigation();
+
+  showStatus(
+    "हिंदी नेविगेशन शुरू है। GPS चालू रखें और सड़क के संकेतों का पालन करें।"
+  );
+}
+
+
+/* =====================================================
+   11. UPDATE GUIDANCE FROM GPS
+===================================================== */
+
+function updateNavigation() {
+  if (
+    !navigating ||
+    !currentPosition ||
+    !routeSteps.length
+  ) {
+    return;
+  }
+
+  while (stepIndex < routeSteps.length - 1) {
+    const maneuver = routeSteps[stepIndex].maneuver;
+
+    if (!maneuver || !maneuver.location) {
+      break;
+    }
+
+    const target = {
+      lat: maneuver.location[1],
+      lng: maneuver.location[0]
+    };
+
+    const distance = distanceMeters(
+      currentPosition,
+      target
+    );
+
+    if (distance < 35) {
+      stepIndex++;
+
+      lastSpoken = hindiInstruction(routeSteps[stepIndex]);
+
+      speakHindi(lastSpoken);
+
+      lastProgressTime = Date.now();
+    } else {
+      break;
+    }
+  }
+
+  const step = routeSteps[stepIndex];
+
+  if (!step) return;
+
+  const maneuver = step.maneuver || {};
+  let distanceText = "";
+
+  if (maneuver.location) {
+    const target = {
+      lat: maneuver.location[1],
+      lng: maneuver.location[0]
+    };
+
+    const distance = distanceMeters(
+      currentPosition,
+      target
+    );
+
+    distanceText =
+      " | अगले मोड़ तक लगभग " +
+      Math.round(distance) +
+      " मीटर";
+  }
+
+  showStatus(
+    "अगला निर्देश: " +
+    hindiInstruction(step) +
+    distanceText
+  );
+
+  lastProgressPosition = {
+    ...currentPosition
+  };
+}
+
+
+/* =====================================================
+   12. REPEAT VOICE
+===================================================== */
+
+function speakCurrent() {
+  if (!routeReady || !routeSteps.length) {
+    showStatus("पहले सड़क का रूट बनाएँ।");
+    return;
+  }
+
+  speakHindi(
+    hindiInstruction(routeSteps[stepIndex])
+  );
+}
+
+
+/* =====================================================
+   13. OPEN DESTINATION IN MAP
+===================================================== */
+
+function searchDestination() {
+  if (!destinationPosition) {
+    showStatus(
+      "पहले मैप पर धर्म कांटे की जगह टैप करें।"
+    );
+    return;
+  }
+
+  const lat = destinationPosition.lat;
+  const lng = destinationPosition.lng;
+
+  const url =
+    "https://www.openstreetmap.org/?mlat=" +
+    encodeURIComponent(lat) +
+    "&mlon=" +
+    encodeURIComponent(lng) +
+    "#map=17/" +
+    encodeURIComponent(lat) +
+    "/" +
+    encodeURIComponent(lng);
+
+  window.open(url, "_blank", "noopener");
+}
+
+
+/* =====================================================
+   14. STOP NAVIGATION
+===================================================== */
+
+function stopNavigation() {
+  navigating = false;
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  if (gpsWatch !== null) {
+    navigator.geolocation.clearWatch(gpsWatch);
+    gpsWatch = null;
+  }
+
+  setBusy(gpsButton, false);
+  setBusy(routeButton, false);
+  setBusy(startButton, false);
+
+  showStatus(
+    "नेविगेशन बंद है। GPS मॉनिटरिंग भी रोक दी गई है।"
+  );
+}
+
+
+/* =====================================================
+   15. BUTTON EVENTS
+===================================================== */
+
+gpsButton.addEventListener("click", startGPS);
+
+searchButton.addEventListener(
+  "click",
+  searchDestination
+);
+
+routeButton.addEventListener(
+  "click",
+  getRoute
+);
+
+startButton.addEventListener(
+  "click",
+  startNavigation
+);
+
+speakButton.addEventListener(
+  "click",
+  speakCurrent
+);
+
+stopButton.addEventListener(
+  "click",
+  stopNavigation
+);
+
+
+/* =====================================================
+   16. APP START
+===================================================== */
+
+window.addEventListener("error", function(event) {
+  console.error("JavaScript error:", event.message);
+
+  showStatus(
+    "JavaScript में समस्या आई है। " +
+    "Chrome Console में लाल error देखें।"
+  );
+});
+
+initMap();
+
+</script>
+
+</body>
+</html>
