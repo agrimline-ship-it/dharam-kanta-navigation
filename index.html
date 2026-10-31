@@ -5,13 +5,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#123d2b">
-
 <title>Dharam Kanta Navigation</title>
 
 <style>
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -27,9 +24,7 @@ header {
   text-align: center;
 }
 
-header h2 {
-  margin: 0 0 8px;
-}
+header h2 { margin: 0 0 8px; }
 
 main {
   max-width: 650px;
@@ -52,14 +47,19 @@ button {
   border-radius: 10px;
   background: #168047;
   color: white;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: bold;
   cursor: pointer;
+  margin-top: 8px;
 }
 
 button:disabled {
   opacity: 0.55;
   cursor: wait;
+}
+
+.mapsSearch {
+  background: #1769aa;
 }
 
 .status {
@@ -107,9 +107,7 @@ button:disabled {
   margin-top: 8px;
 }
 
-.hidden {
-  display: none;
-}
+.hidden { display: none; }
 
 footer {
   text-align: center;
@@ -125,6 +123,7 @@ footer {
 <header>
   <h2>🚚 DHARAM KANTA</h2>
   <div>Smart Truck Weighbridge Finder</div>
+  <div>50 KM Smart Search</div>
 </header>
 
 <main>
@@ -134,11 +133,15 @@ footer {
 <h3>अपने नजदीकी धर्म कांटे खोजें</h3>
 
 <p>
-अपने आसपास उपलब्ध धर्म कांटों की जानकारी प्राप्त करें।
+GPS की सहायता से 50 किलोमीटर तक उपलब्ध धर्म कांटों की खोज करें।
 </p>
 
 <button id="searchButton">
 सबसे नजदीकी कांटा खोजें
+</button>
+
+<button id="mapsSearchButton" class="mapsSearch">
+Google Maps पर धर्म कांटे खोजें
 </button>
 
 <div id="status" class="status" role="status">
@@ -154,7 +157,6 @@ footer {
 <h3>📍 आपके नजदीकी धर्म कांटे</h3>
 
 <div id="count"></div>
-
 <div id="results"></div>
 
 </div>
@@ -168,7 +170,7 @@ footer {
 <p class="small">
 1. नजदीकी कांटा खोजें बटन दबाएँ।<br><br>
 2. मोबाइल GPS की अनुमति दें।<br><br>
-3. कांटों की सूची में अपनी पसंद का कांटा चुनें।<br><br>
+3. सूची में अपनी पसंद का कांटा चुनें।<br><br>
 4. रास्ता देखें बटन दबाएँ।<br><br>
 5. Google Maps में रास्ता जाँचें और Navigation शुरू करें।
 </p>
@@ -180,13 +182,16 @@ footer {
 <h3>महत्वपूर्ण जानकारी</h3>
 
 <p class="small">
-यह वेबसाइट OpenStreetMap के उपलब्ध डेटा से कांटे खोजती है।
-सभी धर्म कांटों का डेटा उपलब्ध होना जरूरी नहीं है।
+यह वेबसाइट OpenStreetMap के उपलब्ध डेटा से धर्म कांटे खोजती है।
+अब खोज में कई संभावित टैग और नाम भी शामिल किए गए हैं।
+
+Google Maps का अलग खोज विकल्प भी दिया गया है।
 
 दिखाई गई दूरी सीधी GPS दूरी है, सड़क की दूरी नहीं।
 
-ट्रक के लिए रास्ते की ऊँचाई, चौड़ाई, वजन सीमा
-और प्रवेश मार्ग अलग से जाँचें।
+सभी धर्म कांटों का ऑनलाइन डेटा उपलब्ध होना जरूरी नहीं है।
+ट्रक के लिए रास्ते की ऊँचाई, चौड़ाई, वजन सीमा और प्रवेश मार्ग
+अलग से जाँचें।
 </p>
 
 </section>
@@ -198,11 +203,13 @@ Map data © OpenStreetMap contributors
 </footer>
 
 <script>
-
 "use strict";
 
 const searchButton =
 document.getElementById("searchButton");
+
+const mapsSearchButton =
+document.getElementById("mapsSearchButton");
 
 const statusBox =
 document.getElementById("status");
@@ -216,9 +223,9 @@ document.getElementById("resultSection");
 const countBox =
 document.getElementById("count");
 
-
 let driverLocation = null;
 
+const SEARCH_RADIUS = 50000;
 
 function distanceBetween(lat1, lon1, lat2, lon2) {
 
@@ -227,11 +234,8 @@ function distanceBetween(lat1, lon1, lat2, lon2) {
   const toRadians = value =>
     value * Math.PI / 180;
 
-  const dLat =
-    toRadians(lat2 - lat1);
-
-  const dLon =
-    toRadians(lon2 - lon1);
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
 
   const a =
     Math.sin(dLat / 2) ** 2 +
@@ -241,9 +245,7 @@ function distanceBetween(lat1, lon1, lat2, lon2) {
 
   return earthRadius *
     2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
 }
-
 
 function formatDistance(meters) {
 
@@ -251,12 +253,8 @@ function formatDistance(meters) {
     return Math.round(meters) + " मीटर";
   }
 
-  const km = meters / 1000;
-
-  return km.toFixed(2) + " किलोमीटर";
-
+  return (meters / 1000).toFixed(2) + " किलोमीटर";
 }
-
 
 function getCoordinates(element) {
 
@@ -271,67 +269,138 @@ function getCoordinates(element) {
   }
 
   if (element.center) {
-
     return {
       lat: element.center.lat,
       lon: element.center.lon
     };
-
   }
 
   return null;
-
 }
 
+function buildOverpassQuery(lat, lon) {
+
+  return `
+    [out:json][timeout:60];
+
+    (
+      nwr["amenity"="weighbridge"]
+      (around:${SEARCH_RADIUS},${lat},${lon});
+
+      nwr["amenity"="weigh_station"]
+      (around:${SEARCH_RADIUS},${lat},${lon});
+
+      nwr["man_made"="weighbridge"]
+      (around:${SEARCH_RADIUS},${lat},${lon});
+
+      nwr["service"="weigh_station"]
+      (around:${SEARCH_RADIUS},${lat},${lon});
+
+      nwr["name"~"weigh|dharam|kanta|कांटा|काँटा",i]
+      (around:${SEARCH_RADIUS},${lat},${lon});
+
+      nwr["operator"~"weigh|dharam|kanta|कांटा|काँटा",i]
+      (around:${SEARCH_RADIUS},${lat},${lon});
+    );
+
+    out center tags;
+  `;
+}
 
 async function searchWeighbridges(lat, lon) {
 
-  const query = `
-    [out:json][timeout:25];
-    (
-      node["amenity"="weighbridge"]
-      (around:20000,${lat},${lon});
+  const query = buildOverpassQuery(lat, lon);
 
-      way["amenity"="weighbridge"]
-      (around:20000,${lat},${lon});
-
-      relation["amenity"="weighbridge"]
-      (around:20000,${lat},${lon});
-    );
-    out center tags;
-  `;
-
-  const response = await fetch(
+  const endpoints = [
     "https://overpass-api.de/api/interpreter",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type":
-          "application/x-www-form-urlencoded;charset=UTF-8"
-      },
-      body: "data=" + encodeURIComponent(query)
-    }
-  );
+    "https://overpass.kumi.systems/api/interpreter"
+  ];
 
-  if (!response.ok) {
-    throw new Error("SEARCH_FAILED");
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+
+    try {
+
+      const controller = new AbortController();
+
+      const timeout = setTimeout(
+        () => controller.abort(),
+        70000
+      );
+
+      try {
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded;charset=UTF-8"
+          },
+          body: "data=" + encodeURIComponent(query),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error("SERVER_" + response.status);
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data.elements)) {
+          throw new Error("INVALID_DATA");
+        }
+
+        return data;
+
+      } finally {
+        clearTimeout(timeout);
+      }
+
+    } catch (error) {
+
+      lastError = error;
+
+    }
   }
 
-  return await response.json();
-
+  throw lastError || new Error("SEARCH_FAILED");
 }
 
+function openGoogleMapsSearch() {
+
+  let query = "Dharam Kanta near Kanker Khera Meerut";
+
+  if (driverLocation) {
+    query =
+      "Weighbridge near " +
+      driverLocation.lat + "," +
+      driverLocation.lon;
+  }
+
+  const url =
+    "https://www.google.com/maps/search/?api=1&query=" +
+    encodeURIComponent(query);
+
+  window.open(url, "_blank");
+}
 
 function showResults(elements) {
 
   resultsBox.innerHTML = "";
 
   const found = [];
+  const seen = new Set();
 
   elements.forEach(element => {
 
-    const coordinates =
-      getCoordinates(element);
+    const uniqueId = element.type + "/" + element.id;
+
+    if (seen.has(uniqueId)) return;
+
+    seen.add(uniqueId);
+
+    const coordinates = getCoordinates(element);
 
     if (!coordinates) return;
 
@@ -342,6 +411,8 @@ function showResults(elements) {
       coordinates.lon
     );
 
+    if (distance > SEARCH_RADIUS) return;
+
     found.push({
       element,
       coordinates,
@@ -350,14 +421,11 @@ function showResults(elements) {
 
   });
 
-
   found.sort((a, b) =>
     a.distance - b.distance
   );
 
-
   resultSection.classList.remove("hidden");
-
 
   if (found.length === 0) {
 
@@ -365,20 +433,18 @@ function showResults(elements) {
 
     resultsBox.innerHTML =
       "<div class='status'>" +
-      "आपके 20 किलोमीटर के दायरे में OpenStreetMap पर " +
+      "50 किलोमीटर के दायरे में OpenStreetMap पर " +
       "कोई दर्ज धर्म कांटा नहीं मिला। " +
-      "इसका मतलब यह नहीं है कि आसपास कोई कांटा मौजूद नहीं है।" +
+      "इसका मतलब यह नहीं है कि आसपास कोई कांटा मौजूद नहीं है। " +
+      "नीचे Google Maps वाला बटन दबाकर भी खोज सकते हैं।" +
       "</div>";
 
     return;
-
   }
-
 
   countBox.textContent =
     "कुल " + found.length +
-    " कांटे मिले। सबसे नजदीक पहले।";
-
+    " संभावित कांटे मिले। सबसे नजदीक पहले।";
 
   found.forEach((item, index) => {
 
@@ -395,11 +461,12 @@ function showResults(elements) {
       "";
 
     const address = [
+      tags["addr:housenumber"],
       tags["addr:street"],
+      tags["addr:suburb"],
       tags["addr:city"],
       tags["addr:state"]
     ].filter(Boolean).join(", ");
-
 
     const destination =
       item.coordinates.lat + "," +
@@ -415,101 +482,62 @@ function showResults(elements) {
       "&destination=" + encodeURIComponent(destination) +
       "&travelmode=driving";
 
-
-    const card =
-      document.createElement("div");
-
+    const card = document.createElement("div");
     card.className = "kanta";
 
-
-    const heading =
-      document.createElement("h3");
-
-    heading.textContent =
-      (index + 1) + ". " + name;
-
+    const heading = document.createElement("h3");
+    heading.textContent = (index + 1) + ". " + name;
     card.appendChild(heading);
 
-
-    const distanceText =
-      document.createElement("div");
-
+    const distanceText = document.createElement("div");
     distanceText.className = "distance";
-
     distanceText.textContent =
       "दूरी: " + formatDistance(item.distance) +
       " (सीधी GPS दूरी)";
-
     card.appendChild(distanceText);
-
 
     if (address) {
 
-      const addressText =
-        document.createElement("p");
-
+      const addressText = document.createElement("p");
       addressText.className = "small";
-
       addressText.textContent = address;
-
       card.appendChild(addressText);
 
     }
 
-
     if (tags.operator && tags.name) {
 
-      const operatorText =
-        document.createElement("p");
-
+      const operatorText = document.createElement("p");
       operatorText.className = "small";
-
       operatorText.textContent =
         "संचालक: " + tags.operator;
-
       card.appendChild(operatorText);
 
     }
 
-
     if (phone) {
 
-      const phoneLink =
-        document.createElement("a");
-
+      const phoneLink = document.createElement("a");
       phoneLink.className = "phone";
-
       phoneLink.href = "tel:" + phone;
-
-      phoneLink.textContent =
-        "📞 फोन करें: " + phone;
-
+      phoneLink.textContent = "📞 फोन करें: " + phone;
       card.appendChild(phoneLink);
 
     }
 
-
-    const navigateButton =
-      document.createElement("button");
-
+    const navigateButton = document.createElement("button");
     navigateButton.className = "navigate";
+    navigateButton.textContent = "इस कांटे तक रास्ता देखें";
 
-    navigateButton.textContent =
-      "इस कांटे तक रास्ता देखें";
-
-    navigateButton.addEventListener(
-      "click",
-      () => window.open(mapsUrl, "_blank")
-    );
+    navigateButton.addEventListener("click", () => {
+      window.open(mapsUrl, "_blank");
+    });
 
     card.appendChild(navigateButton);
-
     resultsBox.appendChild(card);
 
   });
-
 }
-
 
 function handleLocationError(error) {
 
@@ -519,24 +547,15 @@ function handleLocationError(error) {
     "सबसे नजदीकी कांटा खोजें";
 
   const messages = {
-
-    1:
-      "आपने GPS की अनुमति नहीं दी। Chrome में Location Allow करें।",
-
-    2:
-      "आपकी लोकेशन नहीं मिली। मोबाइल GPS चालू करके दोबारा प्रयास करें।",
-
-    3:
-      "GPS का समय समाप्त हो गया। दोबारा प्रयास करें।"
-
+    1: "आपने GPS की अनुमति नहीं दी। Chrome में Location Allow करें।",
+    2: "आपकी लोकेशन नहीं मिली। मोबाइल GPS चालू करके दोबारा प्रयास करें।",
+    3: "GPS का समय समाप्त हो गया। दोबारा प्रयास करें।"
   };
 
   statusBox.textContent =
     messages[error.code] ||
     "GPS में समस्या आई। दोबारा प्रयास करें।";
-
 }
-
 
 function startSearch() {
 
@@ -546,7 +565,6 @@ function startSearch() {
       "यह ब्राउज़र GPS Location को Support नहीं करता।";
 
     return;
-
   }
 
   searchButton.disabled = true;
@@ -557,21 +575,17 @@ function startSearch() {
   statusBox.textContent =
     "कृपया मोबाइल की Location अनुमति दें।";
 
-
   navigator.geolocation.getCurrentPosition(
 
     async position => {
 
       driverLocation = {
-
         lat: position.coords.latitude,
-
         lon: position.coords.longitude
-
       };
 
       statusBox.textContent =
-        "लोकेशन मिल गई। आसपास के कांटे खोजे जा रहे हैं...";
+        "लोकेशन मिल गई। 50 किलोमीटर के आसपास खोज जारी है...";
 
       try {
 
@@ -583,14 +597,22 @@ function startSearch() {
         showResults(data.elements || []);
 
         statusBox.textContent =
-          "खोज पूरी हुई। नीचे उपलब्ध कांटों की सूची देखें।";
+          "खोज पूरी हुई। नीचे उपलब्ध संभावित कांटों की सूची देखें।";
 
       } catch (error) {
 
+        resultSection.classList.remove("hidden");
+
+        countBox.textContent = "";
+
+        resultsBox.innerHTML =
+          "<div class='status'>" +
+          "OpenStreetMap सर्वर से जानकारी नहीं मिल सकी। " +
+          "कृपया Google Maps पर भी खोजें।" +
+          "</div>";
+
         statusBox.textContent =
-          "कांटों की जानकारी प्राप्त नहीं हो सकी। " +
-          "इंटरनेट या मुफ्त खोज सर्वर में समस्या हो सकती है। " +
-          "कुछ देर बाद दोबारा प्रयास करें।";
+          "मुफ्त खोज सर्वर में समस्या हो सकती है।";
 
       }
 
@@ -608,15 +630,17 @@ function startSearch() {
       timeout: 20000,
       maximumAge: 30000
     }
-
   );
-
 }
-
 
 searchButton.addEventListener(
   "click",
   startSearch
+);
+
+mapsSearchButton.addEventListener(
+  "click",
+  openGoogleMapsSearch
 );
 
 </script>
